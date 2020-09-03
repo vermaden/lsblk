@@ -196,6 +196,116 @@ ______EOF
 }
 # __mount_label() ENDED
 
+# PRINT bsdlabel(8) PARTITIONS
+__bsdlabel() { # 1=NAME
+  local NAME=${1}
+  BSDGPART=$( gpart show ${NAME} 2> /dev/null )
+  if [ "${BSDGPART}" != "" ]
+  then
+    echo "${BSDGPART}" \
+      | grep -v '=>' \
+      | while read BSDLINE
+        do
+          # SKIP EMPTY LINES
+          if [ "${BSDLINE}" = "" ]
+          then
+            continue
+          fi
+          # --------------------------------------------------------- #
+          # bsdlabel(8) PARTITIONS                                    #
+          # VISITED MANY TIMES EACH TIME FOR EACH PARTITION           #
+          # --------------------------------------------------------- #
+          # PRINT FREE SPACE
+          if echo "${BSDLINE}" | grep -q -- "- free -" 1> /dev/null 2> /dev/null
+          then
+            # DO NOT DISPLAY 16 SECTORS LONG <FREE> IN EACH bsdlabel(8) SCHEMA
+            BEG=$( echo "${BSDLINE}" | awk 'END{print $1}' )
+            END=$( echo "${BSDLINE}" | awk 'END{print $2}' )
+            if [ "$(( ${END} - ${BEG} ))" = "16" ]
+            then
+              continue
+            fi
+
+            # GET PROVIDER SIZE
+            __get_size "${BSDLINE}"
+
+            # OUTPUT
+            printf "${FORMAT_L2}" "<FREE>" - - ${SIZE} - - -
+            continue
+          else
+            # USED SPACE
+            __get_size "${BSDLINE}"
+            PART=$( echo "${BSDLINE}" | awk 'END{print $3}' )
+            TYPE=$( echo "${BSDLINE}" | awk 'END{print $4}' )
+            if [ "${TYPE}" = "!0" ]
+            then
+              TYPE=freebsd-ufs
+            fi
+
+            # SET APPROPRIATE LETTER FOR EACH PARTITION
+            case ${PART} in
+              (1) BSDPREFIX=a ;;
+              (2) BSDPREFIX=b ;;
+              (3) BSDPREFIX=c ;;
+              (4) BSDPREFIX=d ;;
+              (5) BSDPREFIX=e ;;
+              (6) BSDPREFIX=f ;;
+              (7) BSDPREFIX=g ;;
+              (8) BSDPREFIX=h ;;
+              (9) BSDPREFIX=i ;;
+            esac
+            PART="${NAME}${BSDPREFIX}"
+          fi
+
+          # GET LABEL AND MOUNT
+          __mount_label ${PART}
+
+          # WORKAROUND FOR (null) LABEL
+          if [ "${LABEL}" = "" -o "${LABEL}" = "(null)" ]
+          then
+            LABEL="-"
+          fi
+
+          # GET MAJOR/MINOR DATA
+          __major_minor ${PART}
+
+          # SET PROPER MOUNT FOR bsdlabel(8) PARTITION
+          if [ "${TYPE}" = "freebsd-boot" -o "${TYPE}" = "freebsd" ]
+          then
+            MOUNT="-"
+          fi
+
+          # SWAP ON/OFF DETECTION
+          __swap_detect "${TYPE}"
+
+          # OUTPUT
+          if [ "${PREFIX}" = "b" ]
+          then
+            # bsdlabel(8) WITHOUT PARTITION
+            printf "${FORMAT_L1}" ${PART} ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
+            if [ -e /dev/${PART}.eli ]
+            then
+              # GET GELI MOUNT/LABEL/MAJOR/MINOR
+              __major_minor ${PART}.eli
+              __mount_label ${PART}.eli
+              printf "${FORMAT_L1}" ${PART}.eli ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
+            fi
+          else
+            # bsdlabel(8) WITH PARTITION
+            printf "${FORMAT_L2}" ${PART} ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
+            if [ -e /dev/${PART}.eli ]
+            then
+              # GET GELI MOUNT/LABEL/MAJOR/MINOR
+              __major_minor ${PART}.eli
+              __mount_label ${PART}.eli
+              printf "${FORMAT_L2}" ${PART}.eli ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
+            fi
+          fi
+        done
+  fi
+}
+# __bsdlabel() ENDED
+
 # WHEN GPART OUTPUT EXISTS (partition table / not entire device)
 __gpart_present() {
   # ------------------------------------------------------------------------- #
@@ -242,8 +352,10 @@ __gpart_present() {
           case "${LINE}" in
             (*GPT*) PREFIX=p; continue ;;
             (*MBR*) PREFIX=s; continue ;;
+            (*BSD*) PREFIX=b; continue ;;
             (*)     PREFIX=x; continue ;;
           esac
+
         fi
 
         # ------------------------------------------------------------------- #
@@ -253,139 +365,65 @@ __gpart_present() {
         # GET PROVIDER SIZE
         __get_size "${LINE}"
 
-        # PRINT FREE SPACE
-        if echo "${LINE}" | grep -q -- "- free -" 1> /dev/null 2> /dev/null
-        then
-          printf "${FORMAT_L1}" "<FREE>" - - ${SIZE} - - -
-          continue
-        fi
-
         # USED / PART
         NAME=$( echo "${LINE}" | awk 'END{print $3}' )
         TYPE=$( echo "${LINE}" | awk 'END{print $4}' )
 
-        # DEVICE NAME WITH PARTITION
-        if [ "${DEV}" != "${NAME}" ]
+          # ------------------------------------------------------------------- #
+          # USED / bsdlabel(8) WITHOUT PARTITION                                   #
+          # ------------------------------------------------------------------- #
+        if [ "${PREFIX}" = "b" ]
         then
-          NAME="${DEV}${PREFIX}${NAME}"
-        fi
+          TYPE=
+          # bsdlabel(8) WITHOUT PARTITION
+          __bsdlabel ${DEV}
 
-        # GET LABEL AND MOUNT
-        __mount_label ${NAME}
+        else
 
-        # SWAP ON/OFF DETECTION
-        __swap_detect "${TYPE}"
-
-        # ZFS TYPE SETUP
-        if [ "${TYPE}" = "freebsd-zfs" ]
-        then
-          MOUNT="<ZFS>"
-        fi
-
-        # GET MAJOR/MINOR DATA
-        __major_minor ${NAME}
-
-        # OUTPUT
-        printf "${FORMAT_L1}" ${NAME} ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
-        if [ -e /dev/${NAME}.eli ]
-        then
-          # GET GELI MOUNT/LABEL/MAJOR/MINOR
-          __major_minor ${NAME}.eli
-          __mount_label ${NAME}.eli
-          printf "${FORMAT_L1}" ${NAME}.eli ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
-        fi
-
-        # ------------------------------------------------------------------- #
-        # USED / bsdlabel(8)                                                  #
-        # ------------------------------------------------------------------- #
-        if [ "${TYPE}" = "freebsd" -a "${PREFIX}" != "p" ]
-        then
-          BSDGPART=$( gpart show ${NAME} 2> /dev/null )
-          if [ "${BSDGPART}" != "" ]
+          # PRINT FREE SPACE
+          if echo "${LINE}" | grep -q -- "- free -" 1> /dev/null 2> /dev/null
           then
-            echo "${BSDGPART}" \
-              | grep -v '=>' \
-              | while read BSDLINE
-                do
-                  # SKIP EMPTY LINES
-                  if [ "${BSDLINE}" = "" ]
-                  then
-                    continue
-                  fi
-                  # --------------------------------------------------------- #
-                  # bsdlabel(8) PARTITIONS                                    #
-                  # VISITED MANY TIMES EACH TIME FOR EACH PARTITION           #
-                  # --------------------------------------------------------- #
-                  # PRINT FREE SPACE
-                  if echo "${BSDLINE}" | grep -q -- "- free -" 1> /dev/null 2> /dev/null
-                  then
-                    # DO NOT DISPLAY 16 SECTORS LONG <FREE> IN EACH bsdlabel(8) SCHEMA
-                    BEG=$( echo "${BSDLINE}" | awk 'END{print $1}' )
-                    END=$( echo "${BSDLINE}" | awk 'END{print $2}' )
-                    if [ "$(( ${END} - ${BEG} ))" = "16" ]
-                    then
-                      continue
-                    fi
+            printf "${FORMAT_L1}" "<FREE>" - - ${SIZE} - - -
+            continue
+          fi
 
-                    # GET PROVIDER SIZE
-                    __get_size "${BSDLINE}"
+          # DEVICE NAME WITH PARTITION
+          if [ "${DEV}" != "${NAME}" ]
+          then
+            NAME="${DEV}${PREFIX}${NAME}"
+          fi
 
-                    # OUTPUT
-                    printf "${FORMAT_L2}" "<FREE>" - - ${SIZE} - - -
-                    continue
-                  else
-                    # USED SPACE
-                    __get_size "${BSDLINE}"
-                    PART=$( echo "${BSDLINE}" | awk 'END{print $3}' )
-                    TYPE=$( echo "${BSDLINE}" | awk 'END{print $4}' )
+          # GET LABEL AND MOUNT
+          __mount_label ${NAME}
 
-                    # SET APPROPRIATE LETTER FOR EACH PARTITION
-                    case ${PART} in
-                      (1) BSDPREFIX=a ;;
-                      (2) BSDPREFIX=b ;;
-                      (3) BSDPREFIX=c ;;
-                      (4) BSDPREFIX=d ;;
-                      (5) BSDPREFIX=e ;;
-                      (6) BSDPREFIX=f ;;
-                      (7) BSDPREFIX=g ;;
-                      (8) BSDPREFIX=h ;;
-                      (9) BSDPREFIX=i ;;
-                    esac
-                    PART="${NAME}${BSDPREFIX}"
-                  fi
+          # SWAP ON/OFF DETECTION
+          __swap_detect "${TYPE}"
 
-                  # GET LABEL AND MOUNT
-                  __mount_label ${PART}
+          # ZFS TYPE SETUP
+          if [ "${TYPE}" = "freebsd-zfs" ]
+          then
+            MOUNT="<ZFS>"
+          fi
 
-                  # WORKAROUND FOR (null) LABEL
-                  if [ "${LABEL}" = "" -o "${LABEL}" = "(null)" ]
-                  then
-                    LABEL="-"
-                  fi
+          # GET MAJOR/MINOR DATA
+          __major_minor ${NAME}
 
-                  # GET MAJOR/MINOR DATA
-                  __major_minor ${PART}
+          # OUTPUT
+          printf "${FORMAT_L1}" ${NAME} ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
+          if [ -e /dev/${NAME}.eli ]
+          then
+            # GET GELI MOUNT/LABEL/MAJOR/MINOR
+            __major_minor ${NAME}.eli
+            __mount_label ${NAME}.eli
+            printf "${FORMAT_L1}" ${NAME}.eli ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
+          fi
 
-                  # SET PROPER MOUNT FOR bsdlabel(8) PARTITION
-                  if [ "${TYPE}" = "freebsd-boot" -o "${TYPE}" = "freebsd" ]
-                  then
-                    MOUNT="-"
-                  fi
-
-                  # SWAP ON/OFF DETECTION
-                  __swap_detect "${TYPE}"
-
-                  # OUTPUT
-                  printf "${FORMAT_L2}" ${PART} ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
-                  if [ -e /dev/${PART}.eli ]
-                  then
-                    # GET GELI MOUNT/LABEL/MAJOR/MINOR
-                    __major_minor ${PART}.eli
-                    __mount_label ${PART}.eli
-                    printf "${FORMAT_L2}" ${PART}.eli ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
-                  fi
-
-                done
+          # ------------------------------------------------------------------- #
+          # USED / bsdlabel(8) WITH PARTITION                                   #
+          # ------------------------------------------------------------------- #
+          if [ "${PREFIX}" != "p" -a "${PREFIX}" != "b" ]
+          then
+            __bsdlabel ${NAME}
           fi
         fi
       done
@@ -398,7 +436,11 @@ __gpart_absent() {
   # GPART ABSENT                                                              #
   # ------------------------------------------------------------------------- #
   # GET SIZE INFORMATION FROM diskinfo(8) OUTPUT
-  SIZE=$( diskinfo -v ${DEV} | awk '/mediasize in bytes/ {print $NF}' | tr -d '()' )
+  SIZE=$( diskinfo -v ${DEV} 2> /dev/null| awk '/mediasize in bytes/ {print $NF}' | tr -d '()' )
+  if [ "${SIZE}" = "" ]
+  then
+    SIZE=""
+  fi
 
   # GET MAJOR/MINOR DATA
   __major_minor ${DEV}
@@ -419,9 +461,6 @@ __gpart_absent() {
     else
       # IF ITS NOT ZFS THEN FIND PROPER MOUNT POINT
       TYPE="-"
-
-      # GET LABEL AND MOUNT
-      __mount_label ${DEV}
 
     fi
   fi
