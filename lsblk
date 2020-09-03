@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Copyright (c) 2016-2019 Slawomir Wojciech Wojtczak (vermaden)
+# Copyright (c) 2016-2020 Slawomir Wojciech Wojtczak (vermaden)
 # All rights reserved.
 #
 # THIS SOFTWARE USES FREEBSD LICENSE (ALSO KNOWN AS 2-CLAUSE BSD LICENSE)
@@ -32,6 +32,23 @@
 # https://vermaden.wordpress.com
 
 PATH=${PATH}:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+# DISPLAY VERSION
+if [ "${1}" = "--version" -o \
+     "${1}" =  "-version" -o \
+     "${1}" =   "version" ]
+then
+  echo
+  echo "  ___     ___   ___ __       _ _ _____    "
+  echo "  \  \  __\__\__\  \  \  __ / / /     \   "
+  echo "   \  \/  __/    \  \  \/ // / /   .   \  "
+  echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
+  echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
+  echo
+  echo "lsblk 3.1 2020/09/03"
+  echo
+  exit 0
+fi
 
 # DISPLAY HELP/USAGE/EXAMPLES
 __usage() {
