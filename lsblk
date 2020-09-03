@@ -93,6 +93,7 @@ __major_minor() { # 1=DEV
 # DETECT IF SWAP IS BEING USED
 __swap_mount() { # 1=DEV
   local DEV="${1}"
+  SWAP_FOUND=0
 
   # DETECT SWAP BY RAW DEVICE
   if swapctl -l | grep -q -- ${DEV} 2> /dev/null
@@ -100,6 +101,7 @@ __swap_mount() { # 1=DEV
     TYPE=freebsd-swap
     MOUNT=SWAP
     LABEL="-"
+    SWAP_FOUND=1
     return
   fi
 
@@ -113,6 +115,7 @@ __swap_mount() { # 1=DEV
         TYPE=freebsd-swap
         LABEL=${LABELER}
         MOUNT=SWAP
+        SWAP_FOUND=1
         break
       fi
     fi
@@ -137,18 +140,26 @@ __mount_label() { # 1=TARGET
   local MOUNT_FOUND=0
   local LABEL_FOUND=0
   LABEL="-"
-  MOUNT="-"
+  if [ "${SWAP_FOUND}" = "1" ]
+  then
+    local MOUNT_FOUND=1
+  else
+    MOUNT="-"
+  fi
 
   # CHECK IF DEVICE EXISTS
   [ ! -e /dev/${TARGET} ] && return
 
   # TRY CLASSIC MOUNT POINT WITH DEVICE NAME
-  MOUNT=$( mount | grep "/dev/${TARGET} " | awk 'END{print $3}' )
-  if [ "${MOUNT}" = "" ]
+  if [ "${MOUNT_FOUND}" != "1" ]
   then
-    MOUNT="-"
-  else
-    local MOUNT_FOUND=1
+    MOUNT=$( mount | grep "/dev/${TARGET} " | awk 'END{print $3}' )
+    if [ "${MOUNT}" = "" ]
+    then
+      MOUNT="-"
+    else
+      local MOUNT_FOUND=1
+    fi
   fi
 
   # GET LABEL/MOUNT FOR UFS/zfs(8)/msdosfs(8) FILESYSTEM
@@ -265,6 +276,7 @@ ______EOF
       LABEL="gpt/${LABEL}"
     fi
   fi
+  SWAP_FOUND=0
 }
 # __mount_label() ENDED
 
@@ -321,6 +333,7 @@ __print_parts() { # 1=NAME 2=TYPE 3=SIZE 4=SIZE_FREE
         __type ${NAME}.eli
         __mount_label ${NAME}.eli
         printf "${FORMAT}" ${NAME}.eli ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
+        MOUNT="-"
       fi
       ;;
   esac
@@ -346,8 +359,6 @@ __gpart_present() { # 1=DEV
     then
       TYPE=exfat
       SIZE=$( diskinfo -v ${DEV} 2> /dev/null| awk '/mediasize in bytes/ {print $NF}' | tr -d '()' )
-      #### LABEL/MOUNT/SET
-      # OUTPUT
       __print_parts ${DEV} ${TYPE} ${SIZE} -
       continue
     fi
@@ -365,8 +376,6 @@ __gpart_present() { # 1=DEV
           # WHOLE DEVICE
           LEVEL_DEV=1
           FORMAT="${FORMAT_L0}"
-
-          # OUTPUT
           __print_parts ${NAME} ${TYPE} ${SIZE} ${SIZE_FREE}
         else
           # PARTITION
@@ -392,25 +401,18 @@ __gpart_present() { # 1=DEV
                     # PARTITION
                     FORMAT="${FORMAT_L2}"
                   fi
-
                   # CHECK IF SWAP IS ENABLED FOR SWAP DEVICES
                   [ "${TYPE}" = "freebsd-swap" ] && __swap_mount ${NAMEONE}
-
-                  # GET MOUNT AND LABEL
                   __mount_label ${NAMEONE}
-
-                  # OUTPUT
                   __print_parts ${NAMEONE} ${TYPE} ${SIZE} ${SIZE_FREE}
                 done
           else
             # FILESYSTEM
             [ "${TYPE}" = "freebsd-swap" ] && __swap_mount ${DEV}
             __mount_label ${NAME}
-
             __print_parts ${NAME} ${TYPE} ${SIZE} ${SIZE_FREE}
           fi
         fi
-
       done
 }
 # __gpart_present() ENDED
@@ -420,7 +422,7 @@ __gpart_absent() { # 1=DEV
   local DEV=${1}
   # EXIT IF DEVICE DOES NOT EXISTS
   [ ! -e /dev/${DEV} ] && return
-  local SIZE=$( diskinfo -v ${DEV} 2> /dev/null| awk '/mediasize in bytes/ {print $NF}' | tr -d '()' )
+  local SIZE=$( diskinfo -v ${DEV} 2> /dev/null | awk '/mediasize in bytes/ {print $NF}' | tr -d '()' )
   local SIZE_FREE="-"
   __type ${DEV}
   __mount_label ${DEV}
