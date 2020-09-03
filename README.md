@@ -7,7 +7,7 @@
 
 List information about block devices in the FreeBSD system.
 
-Below you will see examples of lsblk(8) usage.
+Below you will see examples of **lsblk(8)** usage.
 
 ![lsblk(8) Examples](https://github.com/vermaden/lsblk/raw/master/lsblk.examples.png)
 
