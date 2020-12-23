@@ -59,6 +59,7 @@ usage:
   BASIC USAGE INFORMATION
   =======================
   # ${NAME} [DISK]
+  # ${NAME} -d | --disks
 
 example(s):
 
@@ -73,7 +74,6 @@ example(s):
     ada0p3         0:102 931G freebsd-zfs                zfs0 <ZFS>
     ada0p3.eli     0:106 931G freebsd-zfs                   - <ZFS>
 
-
   LIST ONLY da1 BLOCK DEVICE
   --------------------------
   # ${NAME} da1
@@ -82,6 +82,13 @@ example(s):
     da1s1          0:80  2.0G freebsd                       - -
       da1s1a       0:81  1.0G freebsd-ufs                root /
       da1s1b       0:82  1.0G freebsd-swap               swap SWAP
+
+  LIST ENTIRE DISKS
+  -----------------
+  # ${NAME} -d
+  DEVICE SIZE MODEL
+  ada0   1.8T Samsung SSD 860 QVO 2TB
+  ada1   119G SAMSUNG SSD PM830 mSATA 128GB
 
 hint(s):
 
@@ -452,6 +459,25 @@ __gpart_absent() { # 1=DEV
 }
 # __gpart_absent() ENDED
 
+# LIST ENTIRE DISKS ONLY
+__list_disks() {
+  local FORMAT="%-6s %4s %s\n"
+  printf "${FORMAT}" DEVICE SIZE MODEL
+
+  # DO THE JOB
+  echo "${DISKS}" \
+    | while read DEVICE
+      do
+        local SIZE=$( diskinfo -v ${DEVICE} 2> /dev/null | awk '/mediasize in bytes/ {print $NF}' | tr -d '()' )
+        local MODEL=$(    geom disk list ${DEVICE} | awk -F ':' '/descr:/ {print $2}' | sed '$s/^.//' )
+        # local MODEL=$( camcontrol devlist | grep ${DEVICE} | awk -F '>' '{print $1}' | tr -d '<' )
+        printf "${FORMAT}" ${DEVICE} ${SIZE} "${MODEL}"
+      done
+
+  exit 0
+}
+# __list_disks() ENDED
+
 # PARSE ARGUMENTS IF THERE ARE ANY
 LEVEL_DEV=0
 LEVEL_PAR=0
@@ -467,6 +493,9 @@ case ${#} in
     case ${1} in
       (h|-h|--h|help|-help|--help)
         __usage
+        ;;
+      (-d|--disks)
+        __list_disks
         ;;
     esac
     # SINGLE DISK CHECK
