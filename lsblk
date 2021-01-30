@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Copyright (c) 2016-2020 Slawomir Wojciech Wojtczak (vermaden)
+# Copyright (c) 2016-2021 Slawomir Wojciech Wojtczak (vermaden)
 # All rights reserved.
 #
 # THIS SOFTWARE USES FREEBSD LICENSE (ALSO KNOWN AS 2-CLAUSE BSD LICENSE)
@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 3.1 2020/09/03"
+  echo "lsblk 3.3 2021/01/30"
   echo
   exit 0
 fi
@@ -293,7 +293,7 @@ ______EOF
   # GET LABEL FROM gpart(8)
   if [ "${LABEL_FOUND}" != "1" ]
   then
-    LABEL=$( gpart show -p -l ${DEV} 2> /dev/null | sed 's|=>||g' | sed 's-\[active\]--g' | grep "${TARGET} " | awk '{print $4}' )
+    LABEL=$( gpart show -p -l ${DEV} 2> /dev/null | sed 's|=>||g' | sed -E 's-\[.*\]--g' | grep "${TARGET} " | awk '{print $4}' )
     if [ "${LABEL}" = "" -o "${LABEL}" = "(null)" ]
     then
       LABEL="-"
@@ -376,7 +376,7 @@ __gpart_present() { # 1=DEV
 
   # WORKAROUND FOR gpart(1) BUG 240998
   # https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=240998
-  TYPE_EXFAT_HELPER_DEVICE=$( gpart show -p ${DEV} | head -1 | sed 's-\[active\]--g' | awk '{print $5}' 2> /dev/null )
+  TYPE_EXFAT_HELPER_DEVICE=$( gpart show -p ${DEV} | head -1 | sed -E 's-\[.*\]--g' | awk '{print $5}' 2> /dev/null )
   if [ "${TYPE_EXFAT_HELPER_DEVICE}" = "MBR" ]
   then
     TYPE_EXFAT_HELPER=$( fstyp -u /dev/${DEV} 2> /dev/null )
@@ -390,7 +390,7 @@ __gpart_present() { # 1=DEV
   fi
 
   # READ PARTITIONS OF PROVIDER
-  local GPART=$( gpart show -p ${DEV} 2> /dev/null | sed 's-\[active\]--g' | sed 's|=>||g' )
+  local GPART=$( gpart show -p ${DEV} 2> /dev/null | sed -E 's-\[.*\]--g' | sed 's|=>||g' )
   # PARSE gpart(8) OUTPUT
   echo "${GPART}" \
     | while read BEG END NAME TYPE SIZE SIZE_FREE
@@ -406,7 +406,7 @@ __gpart_present() { # 1=DEV
           # PARTITION
           FORMAT="${FORMAT_L1}"
           # READ PARTITIONS OF PROVIDER
-          local GPART_PARTS=$( gpart show -p ${NAME} 2> /dev/null | sed 's-\[active\]--g' | sed 's|=>||g' )
+          local GPART_PARTS=$( gpart show -p ${NAME} 2> /dev/null | sed -E 's-\[.*\]--g' | sed 's|=>||g' )
           # PARSE gpart(8) OUTPUT
           if [ "${GPART_PARTS}" != "" ]
           then
@@ -481,7 +481,7 @@ __list_disks() {
 # PARSE ARGUMENTS IF THERE ARE ANY
 LEVEL_DEV=0
 LEVEL_PAR=0
-GLABEL=$( glabel status | sed 1d )
+GLABEL=$( glabel status | sed 1d | grep -v gptid )
 DISKS=$( __list_block_devices )
 case ${#} in
   (0)
