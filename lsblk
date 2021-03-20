@@ -369,6 +369,7 @@ __print_parts() { # 1=NAME 2=TYPE 3=SIZE 4=SIZE_FREE
 __gpart_present() { # 1=DEV
   local DEV=${1}
   local TYPE="-"
+  local LABEL="-"
   local SIZE="-"
   local SIZE_FREE="-"
   # CHECK IF DEVICE EXISTS
