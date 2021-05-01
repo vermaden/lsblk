@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 3.3 2021/01/30"
+  echo "lsblk 3.4 2021/05/02"
   echo
   exit 0
 fi
@@ -308,15 +308,18 @@ ______EOF
 # LIST BLOCK DEVICES
 __list_block_devices() {
   # FIRST 1000 DEVICES OF EACH CLASS SHOULD DO
-  for I in ada da mmcsd md vtbd
-  do
-    ls -1 /dev/${I}[0-9]           2> /dev/null
-    ls -1 /dev/${I}[0-9][0-9]      2> /dev/null
-    ls -1 /dev/${I}[0-9][0-9][0-9] 2> /dev/null
-  done \
-    | sed 's|/dev/||g' \
-    | sort -u \
-    | sed '/^s*$/d'
+  (
+    sysctl -n kern.disks | tr ' ' '\n'
+    for I in ada da mmcsd md vtbd
+    do
+      ls -1 /dev/${I}[0-9]           2> /dev/null
+      ls -1 /dev/${I}[0-9][0-9]      2> /dev/null
+      ls -1 /dev/${I}[0-9][0-9][0-9] 2> /dev/null
+    done
+  ) \
+      | sed 's|/dev/||g' \
+      | sort -u \
+      | sed '/^s*$/d'
 }
 # __list_block_devices() ENDED
 
