@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 3.5 2021/05/15"
+  echo "lsblk 3.6 2021/07/29"
   echo
   exit 0
 fi
@@ -242,7 +242,7 @@ __mount_label() { # 1=TARGET
     else
       while read PROVIDER STATUS DEVICE
       do
-        LABEL=$( echo "${GLABEL_GREP}" | grep -m 1 "${TARGET}"  | awk '{print $1}' )
+        LABEL=$( echo "${GLABEL_GREP}" | grep -m 1 " ${TARGET}"  | awk '{print $1}' )
         local LABEL_FOUND=1
         break
       done << ______EOF
@@ -277,11 +277,12 @@ ______EOF
   # GET MOUNT FROM fuse(8)
   if [ "${MOUNT_FOUND}" != "1" ]
   then
-    local FUSE_PIDS=$( pgrep mount.exfat ntfs-3g | tr '\n' ',' | sed '$s/.$//' )
+  # local FUSE_PIDS=$( pgrep mount.exfat ntfs-3g | tr '\n' ',' | sed '$s/.$//' )
+    local FUSE_PIDS=$( fstat /dev/fuse | awk 'NR > 1 {print $3}' | tr '\n' ',' | sed '$s/.$//' )
     if [ "${FUSE_PIDS}" != "" ]
     then
       local FUSE_MOUNTS=$( ps -p "${FUSE_PIDS}" -o command | sed 1d | sort -u )
-      MOUNT=$( echo "${FUSE_MOUNTS}" | grep "/dev/${TARGET} " | awk '{print $NF}' )
+      MOUNT=$( echo "${FUSE_MOUNTS}" | grep "/dev/${TARGET} " | sed 's|(mount.exfat-fuse)||g' | awk '{print $NF}' )
       # TRY automount(8) STATE FILE IF EXISTS
       if [ "${MOUNT}" = "" ]
       then
@@ -513,10 +514,15 @@ __list_disks() {
     | while read DEVICE
       do
         case ${DEVICE} in
-          (md*) local SIZE=$( diskinfo -v ${DEVICE} 2> /dev/null| awk '/mediasize in bytes/ {print $NF}' | tr -d '()' ) ;;
-          (*)   local SIZE=$( geom disk list ${DEVICE} | awk '/Mediasize:/ {print $NF}' | tr -d '()' )                  ;;
+          (md*)
+            local SIZE=$( diskinfo -v ${DEVICE} 2> /dev/null| awk '/mediasize in bytes/ {print $NF}' | tr -d '()' )
+            local MODEL="FreeBSD md(4) Memory Disk"
+            ;;
+          (*)
+            local SIZE=$( geom disk list ${DEVICE} | awk '/Mediasize:/ {print $NF}' | tr -d '()' )
+            local MODEL=$( geom disk list ${DEVICE} | awk -F ':' '/descr:/ {print $2}' | sed '$s/^.//' )
+            ;;
         esac
-        local MODEL=$( geom disk list ${DEVICE} | awk -F ':' '/descr:/ {print $2}' | sed '$s/^.//' )
         [ "${SIZE}"  = "" ] && local SIZE="-"
         printf "${FORMAT}" ${DEVICE} ${SIZE} "${MODEL}"
       done
@@ -561,9 +567,9 @@ case ${#} in
 esac
 
 # SET OUTPUT FORMAT AND PRINT HEADER
-    FORMAT_L0="%-14s %3s:%-3s %4s %-18s %20s %s\n"
-  FORMAT_L1="  %-12s %3s:%-3s %4s %-18s %20s %s\n"
-FORMAT_L2="    %-10s %3s:%-3s %4s %-18s %20s %s\n"
+    FORMAT_L0="%-14s %3s:%-3s %4s %-18s %32s %s\n"
+  FORMAT_L1="  %-12s %3s:%-3s %4s %-18s %32s %s\n"
+FORMAT_L2="    %-10s %3s:%-3s %4s %-18s %32s %s\n"
 FORMAT="${FORMAT_L0}"
 printf "${FORMAT}" DEVICE MAJ MIN SIZE TYPE LABEL MOUNT
 
