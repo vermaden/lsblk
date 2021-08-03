@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 3.6 2021/07/29"
+  echo "lsblk 3.6.1 2021/08/03"
   echo
   exit 0
 fi
@@ -277,8 +277,12 @@ ______EOF
   # GET MOUNT FROM fuse(8)
   if [ "${MOUNT_FOUND}" != "1" ]
   then
-  # local FUSE_PIDS=$( pgrep mount.exfat ntfs-3g | tr '\n' ',' | sed '$s/.$//' )
-    local FUSE_PIDS=$( fstat /dev/fuse | awk 'NR > 1 {print $3}' | tr '\n' ',' | sed '$s/.$//' )
+    if [ -e /dev/fuse ]
+    then
+      local FUSE_PIDS=$( fstat /dev/fuse | awk 'NR > 1 {print $3}' | tr '\n' ',' | sed '$s/.$//' )
+    else
+      local FUSE_PIDS=$( pgrep mount.exfat ntfs-3g | tr '\n' ',' | sed '$s/.$//' )
+    fi
     if [ "${FUSE_PIDS}" != "" ]
     then
       local FUSE_MOUNTS=$( ps -p "${FUSE_PIDS}" -o command | sed 1d | sort -u )
