@@ -279,9 +279,9 @@ ______EOF
   then
     if [ -e /dev/fuse ]
     then
-      local FUSE_PIDS=$( fstat /dev/fuse | awk 'NR > 1 {print $3}' | tr '\n' ',' | sed '$s/.$//' )
+      local FUSE_PIDS=$( fstat /dev/fuse 2> /dev/null | awk 'NR > 1 {print $3}' | tr '\n' ',' | sed '$s/.$//' )
     else
-      local FUSE_PIDS=$( pgrep mount.exfat ntfs-3g | tr '\n' ',' | sed '$s/.$//' )
+      local FUSE_PIDS=$( pgrep mount.exfat ntfs-3g 2> /dev/null | tr '\n' ',' | sed '$s/.$//' )
     fi
     if [ "${FUSE_PIDS}" != "" ]
     then
