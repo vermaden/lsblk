@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Copyright (c) 2016-2021 Slawomir Wojciech Wojtczak (vermaden)
+# Copyright (c) 2016-2022 Slawomir Wojciech Wojtczak (vermaden)
 # All rights reserved.
 #
 # THIS SOFTWARE USES FREEBSD LICENSE (ALSO KNOWN AS 2-CLAUSE BSD LICENSE)
@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 3.7 2021/08/28"
+  echo "lsblk 3.8 2022/06/18"
   echo
   exit 0
 fi
@@ -242,7 +242,7 @@ __mount_label() { # 1=TARGET
     else
       while read PROVIDER STATUS DEVICE
       do
-        LABEL=$( echo "${GLABEL_GREP}" | grep -m 1 " ${TARGET}"  | awk '{print $1}' )
+        LABEL=$( echo "${GLABEL_GREP}" | grep -m 1 " ${TARGET}"  | awk '{print $1}' | sed -e 's@%20@ @g' )
         local LABEL_FOUND=1
         break
       done << ______EOF
@@ -311,7 +311,8 @@ ______EOF
   # GET LABEL FROM gpart(8)
   if [ "${LABEL_FOUND}" != "1" ]
   then
-    LABEL=$( gpart show -p -l ${DEV} 2> /dev/null | sed 's|=>||g' | sed -E 's-\[.*\]--g' | grep "${TARGET} " | awk '{print $4}' )
+  # LABEL=$( gpart show -p -l ${DEV} 2> /dev/null | sed 's|=>||g' | sed -E 's-\[.*\]--g' | grep "${TARGET} " | awk '{print $4}' )
+    LABEL=$( gpart show -p -l ${DEV} 2> /dev/null | sed 's|=>||g' | sed -E 's-\[.*\]--g' | grep "${TARGET} " | awk '{for (i=4; i<256; i++) if ($i) if($i != $NF) print $i}' )
     if [ "${LABEL}" = "" -o "${LABEL}" = "(null)" ]
     then
       LABEL="-"
@@ -356,7 +357,7 @@ __print_parts() { # 1=NAME 2=TYPE 3=SIZE 4=SIZE_FREE
       # FIRST 16 SECTORS ARE ALWAYS EMPTY ON bsdlabel(8) PARTITION SCHEMA
       [ "${SIZE_FREE}" = "8.0K" ] && return
       # OUTPUT
-      printf "${FORMAT}" "<FREE>" - - ${SIZE_FREE} "-" ${LABEL} ${MOUNT}
+      printf "${FORMAT}" "<FREE>" - - ${SIZE_FREE} "-" "${LABEL}" ${MOUNT}
       ;;
     (*)
       # NEEDED FOR bsdlabel(8) ON WHOLE DISK WITHOUT PARTITION
@@ -372,14 +373,14 @@ __print_parts() { # 1=NAME 2=TYPE 3=SIZE 4=SIZE_FREE
       [ "${LABEL}" = "" ] && local LABEL="-"
       [ "${MOUNT}" = "" ] && local MOUNT="-"
       __major_minor ${NAME}
-      printf "${FORMAT}" ${NAME} ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
+      printf "${FORMAT}" ${NAME} ${MAJ} ${MIN} ${SIZE} ${TYPE} "${LABEL}" ${MOUNT}
       if [ -e /dev/${NAME}.eli ]
       then
         # GET GELI MOUNT/LABEL/MAJOR/MINOR
         __major_minor ${NAME}.eli
         __type ${NAME}.eli
         __mount_label ${NAME}.eli
-        printf "${FORMAT}" ${NAME}.eli ${MAJ} ${MIN} ${SIZE} ${TYPE} ${LABEL} ${MOUNT}
+        printf "${FORMAT}" ${NAME}.eli ${MAJ} ${MIN} ${SIZE} ${TYPE} "${LABEL}" ${MOUNT}
         MOUNT="-"
       fi
       ;;
