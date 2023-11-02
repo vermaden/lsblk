@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 3.8 2022/06/18"
+  echo "lsblk 3.8 2023/11/02"
   echo
   exit 0
 fi
@@ -397,8 +397,11 @@ __gpart_present() { # 1=DEV
   local SIZE="-"
   local SIZE_FREE="-"
   # CHECK IF DEVICE EXISTS
-  [ ! -e /dev/${DEV} ] && return
-
+  if [ ! -e ${DEV} ]
+  then
+    DEV=/dev/${DEV}
+    [ ! -e ${DEV} ] && return
+  fi
   # WORKAROUND FOR gpart(1) BUG 240998
   # https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=240998
   TYPE_EXFAT_HELPER_DEVICE=$( gpart show -p ${DEV} | head -1 | sed -E 's-\[.*\]--g' | awk '{print $5}' 2> /dev/null )
@@ -492,7 +495,11 @@ __gpart_present() { # 1=DEV
 __gpart_absent() { # 1=DEV
   local DEV=${1}
   # EXIT IF DEVICE DOES NOT EXISTS
-  [ ! -e /dev/${DEV} ] && return
+  if [ ! -e ${DEV} ]
+  then
+    DEV=/dev/${DEV}
+    [ ! -e ${DEV} ] && return
+  fi
   local MOUNT="-"
   case ${DEV} in
     (md*) local SIZE=$( diskinfo -v ${DEV} 2> /dev/null | awk '/mediasize in bytes/ {print $NF}' | tr -d '()' ) ;;
@@ -516,7 +523,24 @@ __gpart_absent() { # 1=DEV
 
 # LIST ENTIRE DISKS ONLY
 __list_disks() {
-  local FORMAT="%-6s %4s %s\n"
+  # GET WIDTH FOR ${DEVICE} COLUMN
+  local DEVICE_WIDTH=$(
+    echo -e "DEVICE\n${DISKS}" \
+      | while read I
+        do
+          echo ${I} \
+            | wc -c
+        done \
+          | sort -u \
+          | tail -1 \
+          | tr -cd 0-9
+  )
+  local DEVICE_WIDTH=$(( ${DEVICE_WIDTH} - 1 ))
+
+  # SET FORMAT
+  local FORMAT="%-${DEVICE_WIDTH}s %4s %s\n"
+
+  # PRINT HEADER
   printf "${FORMAT}" DEVICE SIZE MODEL
 
   # DO THE JOB
@@ -530,7 +554,7 @@ __list_disks() {
             ;;
           (*)
             local SIZE=$(  geom disk list ${DEVICE} | awk '/Mediasize:/ {print $NF}' | tr -d '()' )
-            local MODEL=$( geom disk list ${DEVICE} | awk -F ':' '/descr:/ {print $2}' | sed '$s/^.//' )
+            local MODEL=$( geom disk list ${DEVICE} | awk -F ':' '/descr:/ {print $2}' | sed '$s/^.//' | tr -cd '0-9a-zA-Z -./\n' )
             ;;
         esac
         [ "${SIZE}"  = "" ] && local SIZE="-"
@@ -544,6 +568,7 @@ LEVEL_DEV=0
 LEVEL_PAR=0
 GLABEL=$( glabel status | sed 1d | grep -v gptid )
 DISKS=$( __list_block_devices )
+
 case ${#} in
   (0)
     # LIST ALL DISKS
@@ -561,11 +586,14 @@ case ${#} in
         ;;
     esac
     # SINGLE DISK CHECK
-    if echo "${DISKS}" | grep -q -- "${1}"
+    DISKCHECK="${1}"
+    DISKCHECK=$( echo "${1}" | sed s./dev/..g )
+    if echo "${DISKS}" | grep -q -- "${DISKCHECK}"
     then
-      DISKS="${1}"
+      DISKS="${DISKCHECK}"
+      unset DISKCHECK
     else
-      echo "NOPE: disk '${1}' does not exist in the system"
+      echo "NOPE: disk '${DISKCHECK}' does not exist in the system"
       echo
       __usage
     fi
@@ -577,9 +605,9 @@ case ${#} in
 esac
 
 # SET OUTPUT FORMAT AND PRINT HEADER
-    FORMAT_L0="%-14s %3s:%-3s %4s %-18s %32s %s\n"
-  FORMAT_L1="  %-12s %3s:%-3s %4s %-18s %32s %s\n"
-FORMAT_L2="    %-10s %3s:%-3s %4s %-18s %32s %s\n"
+    FORMAT_L0="%-14s %3s:%-3s %4s %-18s %26s %s\n"
+  FORMAT_L1="  %-12s %3s:%-3s %4s %-18s %26s %s\n"
+FORMAT_L2="    %-10s %3s:%-3s %4s %-18s %26s %s\n"
 FORMAT="${FORMAT_L0}"
 printf "${FORMAT}" DEVICE MAJ MIN SIZE TYPE LABEL MOUNT
 
