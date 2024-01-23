@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Copyright (c) 2016-2022 Slawomir Wojciech Wojtczak (vermaden)
+# Copyright (c) 2016-2024 Slawomir Wojciech Wojtczak (vermaden)
 # All rights reserved.
 #
 # THIS SOFTWARE USES FREEBSD LICENSE (ALSO KNOWN AS 2-CLAUSE BSD LICENSE)
@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 3.8 2023/11/02"
+  echo "lsblk 3.8 2024/01/23"
   echo
   exit 0
 fi
@@ -528,13 +528,11 @@ __list_disks() {
     echo -e "DEVICE\n${DISKS}" \
       | while read I
         do
-          echo ${I} \
-            | wc -c
+          echo ${I} | wc -c
         done \
           | sort -u \
           | tail -1 \
-          | tr -cd 0-9
-  )
+          | tr -cd 0-9 )
   local DEVICE_WIDTH=$(( ${DEVICE_WIDTH} - 1 ))
 
   # SET FORMAT
@@ -554,7 +552,7 @@ __list_disks() {
             ;;
           (*)
             local SIZE=$(  geom disk list ${DEVICE} | awk '/Mediasize:/ {print $NF}' | tr -d '()' )
-            local MODEL=$( geom disk list ${DEVICE} | awk -F ':' '/descr:/ {print $2}' | sed '$s/^.//' | tr -cd '0-9a-zA-Z -./\n' )
+            local MODEL=$( geom disk list ${DEVICE} | awk -F ':' '/descr:/ {print $2}' | sed '$s/^.//' | tr -cd '0-9a-zA-Z -./\n' | tr -d '?' )
             ;;
         esac
         [ "${SIZE}"  = "" ] && local SIZE="-"
