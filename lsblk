@@ -109,7 +109,7 @@ __EOF
 
 # GET MAJOR/MINOR NUMBERS
 __major_minor() { # 1=DEV
-  local DEV=${1}
+  local DEV=$( echo "${1}" | sed s./dev/..g )
   MAJ=$( stat -f "%Hr" /dev/${DEV} )
   MIN=$( stat -f "%Lr" /dev/${DEV} )
 }
@@ -501,9 +501,10 @@ __gpart_absent() { # 1=DEV
     [ ! -e ${DEV} ] && return
   fi
   local MOUNT="-"
+  local DEV=$( echo "${DEV}" | sed s./dev/..g )
   case ${DEV} in
-    (md*) local SIZE=$( diskinfo -v ${DEV} 2> /dev/null | awk '/mediasize in bytes/ {print $NF}' | tr -d '()' ) ;;
-    (*)   local SIZE=$( geom disk list ${DEV} | awk '/Mediasize:/ {print $NF}' | tr -d '()' )                   ;;
+    (md*) local SIZE=$( diskinfo -v    ${DEV} 2> /dev/null | awk '/mediasize in bytes/ {print $NF}' | tr -d '()' ) ;;
+    (*)   local SIZE=$( geom disk list ${DEV} 2> /dev/null | awk '/Mediasize:/         {print $NF}' | tr -d '()' ) ;;
   esac
   # WHEN SIZE IS NOT AVAILABLE ITS PROBABLY EMPTY CARD READER
   if [ "${SIZE}"  = "0B" ]
