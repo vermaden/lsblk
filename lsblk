@@ -641,7 +641,7 @@ EOF
   # PRINT TOTAL STORAGE INFO
   __list_disks_unit_set ${MAXUNIT}
   SUM=$( echo "${SUM} / ${MAXDIV}" | bc -l )
-  SUM=$( printf "%3.1f" "${SUM}" )
+  SUM=$( printf "%3.0f" "${SUM}" )
   printf "${FORMAT}" - "${SUM}${ENDUNIT}" "TOTAL SYSTEM STORAGE"
   unset MAXUNIT MAXDIV ENDUNIT SUM
 }
