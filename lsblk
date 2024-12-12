@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 3.8 2024/01/23"
+  echo "lsblk 3.9 2024/12/12"
   echo
   exit 0
 fi
@@ -235,7 +235,7 @@ __mount_label() { # 1=TARGET
   if [ "${LABEL_FOUND}" != "1" ]
   then
     # TRY GLABEL MOUNTPOINT AS msdosfs MOUNT IS NOT POSSIBLE WITHOUT GPT/MBR
-    local GLABEL_GREP=$( echo "${GLABEL}" | grep -v ufsid | grep "${TARGET}\$" )
+    local GLABEL_GREP=$( echo "${GLABEL}" | grep -v ufsid | grep " ${TARGET}\$" )
     if [ "${GLABEL_GREP}" = "" ]
     then
       LABEL="-"
@@ -255,7 +255,7 @@ ______EOF
   if [ "${MOUNT_FOUND}" != "1" ]
   then
     # TRY GLABEL MOUNTPOINT AS msdosfs MOUNT IS NOT POSSIBLE WITHOUT GPT/MBR
-    local GLABEL_GREP=$( echo "${GLABEL}" | grep -v ufsid | grep "${TARGET}\$" )
+    local GLABEL_GREP=$( echo "${GLABEL}" | grep -v ufsid | grep " ${TARGET}\$" )
     if [ "${GLABEL_GREP}" != "" ]
     then
       while read PROVIDER STATUS DEVICE
@@ -311,8 +311,7 @@ ______EOF
   # GET LABEL FROM gpart(8)
   if [ "${LABEL_FOUND}" != "1" ]
   then
-  # LABEL=$( gpart show -p -l ${DEV} 2> /dev/null | sed 's|=>||g' | sed -E 's-\[.*\]--g' | grep "${TARGET} " | awk '{print $4}' )
-    LABEL=$( gpart show -p -l ${DEV} 2> /dev/null | sed 's|=>||g' | sed -E 's-\[.*\]--g' | grep "${TARGET} " | awk '{for (i=4; i<256; i++) if ($i) if($i != $NF) print $i}' )
+    LABEL=$( gpart show -p ${DEV} 2> /dev/null | sed 's|=>||g' | sed -E 's-\[.*\]--g' | grep "${TARGET} " | awk '{for (i=4; i<256; i++) if ($i) if($i != $NF) print $i}' )
     if [ "${LABEL}" = "" -o "${LABEL}" = "(null)" ]
     then
       LABEL="-"
@@ -373,6 +372,16 @@ __print_parts() { # 1=NAME 2=TYPE 3=SIZE 4=SIZE_FREE
       [ "${LABEL}" = "" ] && local LABEL="-"
       [ "${MOUNT}" = "" ] && local MOUNT="-"
       __major_minor ${NAME}
+
+      # REPLACE LONG Microsoft BULLSHIT NAMES WITH SOMETHING RELEVANT
+      LABEL=$( echo "${LABEL}" \
+                 | sed -e 's.EFI system partition.EFI.g' \
+                       -e 's.Microsoft reserved partition.MS/reserved.g' \
+                       -e 's.Main Data Partition.MS/data/main.g' \
+                       -e 's.Basic data partition.MS/data/basic.g'
+             )
+
+      # PRINT INFORMATION ON TERMINAL
       printf "${FORMAT}" ${NAME} ${MAJ} ${MIN} ${SIZE} ${TYPE} "${LABEL}" ${MOUNT}
       if [ -e /dev/${NAME}.eli ]
       then
@@ -404,7 +413,7 @@ __gpart_present() { # 1=DEV
   fi
   # WORKAROUND FOR gpart(1) BUG 240998
   # https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=240998
-  TYPE_EXFAT_HELPER_DEVICE=$( gpart show -p ${DEV} | head -1 | sed -E 's-\[.*\]--g' | awk '{print $5}' 2> /dev/null )
+  TYPE_EXFAT_HELPER_DEVICE=$( gpart show -p ${DEV} 2> /dev/null | head -1 | sed -E 's-\[.*\]--g' | awk '{print $5}' 2> /dev/null )
   if [ "${TYPE_EXFAT_HELPER_DEVICE}" = "MBR" ]
   then
     TYPE_EXFAT_HELPER=$( fstyp -u /dev/${DEV} 2> /dev/null )
@@ -412,8 +421,8 @@ __gpart_present() { # 1=DEV
     then
       TYPE=exfat
       case ${DEV} in
-        (md*) SIZE=$( diskinfo -v ${DEV} 2> /dev/null| awk '/mediasize in bytes/ {print $NF}' | tr -d '()' ) ;;
-        (*)   SIZE=$( geom disk list ${DEV} | awk '/Mediasize:/ {print $NF}' | tr -d '()' )                  ;;
+        (md*) SIZE=$( diskinfo -v    ${DEV} 2> /dev/null | awk '/mediasize in bytes/ {print $NF}' | tr -d '()' ) ;;
+        (*)   SIZE=$( geom disk list ${DEV} 2> /dev/null | awk '/Mediasize:/ {print $NF}'         | tr -d '()' ) ;;
       esac
       __mount_label ${DEV}
       # EXFAT FILESYSTEM ON WHOLE DEVICE IS INTERPETED AS MBR - FIX THAT
@@ -518,9 +527,49 @@ __gpart_absent() { # 1=DEV
   [ "${TYPE}"  = "" ] && local TYPE="-"
   [ "${LABEL}" = "" ] && local LABEL="-"
   [ "${MOUNT}" = "" ] && local MOUNT="-"
+  # REMOVE SPACE(S)
+  LABEL=$( echo ${LABEL} )
   __print_parts ${DEV} ${TYPE} ${SIZE} ${SIZE_FREE}
 }
 # __gpart_absent() ENDED
+
+# CHECK MAX UNIT
+__list_disks_max_unit() { # 1=UNIT_TO_CHECK_IN_NUMBER
+  ORDER=${1}
+  if [ ${1} -gt ${MAXUNIT} ]
+  then
+    MAXUNIT=${1}
+  fi
+  }
+# __list_disks_max_unit() ENDED
+
+# SET DIV/UNIT/MAXDIV VALUE
+__list_disks_max_div() { # 1=ORDER TO SET
+  case ${1} in
+    (1) DIV=$(( 1024 ))                             ; UNIT=K ;;
+    (2) DIV=$(( 1024 * 1024 ))                      ; UNIT=M ;;
+    (3) DIV=$(( 1024 * 1024 * 1024 ))               ; UNIT=G ;;
+    (4) DIV=$(( 1024 * 1024 * 1024 * 1024 ))        ; UNIT=T ;;
+    (5) DIV=$(( 1024 * 1024 * 1024 * 1024 * 1024 )) ; UNIT=E ;;
+  esac
+  if [ ${DIV} -gt ${MAXDIV} ]
+  then
+    MAXDIV=${DIV}
+  fi
+  }
+# __list_disks_max_div() ENDED
+
+# SET ENDUNIT FOR TOTALE STORAGE SUM PRINTING
+__list_disks_unit_set() { # 1=ORDER TO SET
+  case ${1} in
+    (1) ENDUNIT=K ;;
+    (2) ENDUNIT=M ;;
+    (3) ENDUNIT=G ;;
+    (4) ENDUNIT=T ;;
+    (5) ENDUNIT=E ;;
+  esac
+  }
+# __list_disks_unit_set() ENDED
 
 # LIST ENTIRE DISKS ONLY
 __list_disks() {
@@ -534,7 +583,15 @@ __list_disks() {
           | sort -u \
           | tail -1 \
           | tr -cd 0-9 )
+
+  # LOCAL VARIABLES
   local DEVICE_WIDTH=$(( ${DEVICE_WIDTH} - 1 ))
+
+  # NOT LOCAL VARIABLES
+  MAXUNIT=1
+  MAXDIV=1024
+  ENDUNIT=K
+  SUM=0
 
   # SET FORMAT
   local FORMAT="%-${DEVICE_WIDTH}s %4s %s\n"
@@ -543,22 +600,50 @@ __list_disks() {
   printf "${FORMAT}" DEVICE SIZE MODEL
 
   # DO THE JOB
-  echo "${DISKS}" \
-    | while read DEVICE
-      do
-        case ${DEVICE} in
-          (md*)
-            local SIZE=$( diskinfo -v ${DEVICE} 2> /dev/null| awk '/mediasize in bytes/ {print $NF}' | tr -d '()' )
-            local MODEL="FreeBSD md(4) Memory Disk"
-            ;;
-          (*)
-            local SIZE=$(  geom disk list ${DEVICE} | awk '/Mediasize:/ {print $NF}' | tr -d '()' )
-            local MODEL=$( geom disk list ${DEVICE} | awk -F ':' '/descr:/ {print $2}' | sed '$s/^.//' | tr -cd '0-9a-zA-Z -./\n' | tr -d '?' )
-            ;;
-        esac
-        [ "${SIZE}"  = "" ] && local SIZE="-"
-        printf "${FORMAT}" ${DEVICE} ${SIZE} "${MODEL}"
-      done
+  while read DEVICE
+  do
+    # GET PER DEVICE INFO
+    case ${DEVICE} in
+      (md*)
+        local SIZE=$( diskinfo -v ${DEVICE} 2> /dev/null| awk '/mediasize in bytes/ {print $NF}' | tr -d '()' )
+        local MODEL="FreeBSD md(4) Memory Disk"
+        ;;
+      (*)
+        local GEOM_DISK_LIST=$( geom disk list ${DEVICE} 2> /dev/null )
+        local SIZE=$(  echo "${GEOM_DISK_LIST}" | awk '/Mediasize:/ {print $NF}' | tr -d '()' )
+        local MODEL=$( echo "${GEOM_DISK_LIST}" | awk -F ':' '/descr:/ {print $2}' | sed '$s/^.//' | tr -cd '0-9a-zA-Z -./\n' | tr -d '?' )
+        unset GEOM_DISK_LIST
+        ;;
+    esac
+
+    # CALCULATE TOTAL STORAGE SUM
+    case ${SIZE} in
+      (*K|*k) MULT=$(( 1024                             )) ; ORDER=1 ; __list_disks_max_unit ${ORDER} ;;
+      (*M|*m) MULT=$(( 1024 * 1024                      )) ; ORDER=2 ; __list_disks_max_unit ${ORDER} ;;
+      (*G|*g) MULT=$(( 1024 * 1024 * 1024               )) ; ORDER=3 ; __list_disks_max_unit ${ORDER} ;;
+      (*T|*t) MULT=$(( 1024 * 1024 * 1024 * 1024        )) ; ORDER=4 ; __list_disks_max_unit ${ORDER} ;;
+      (*E|*e) MULT=$(( 1024 * 1024 * 1024 * 1024 * 1024 )) ; ORDER=5 ; __list_disks_max_unit ${ORDER} ;;
+    esac
+    BYTES=$( echo ${SIZE} | tr -c -d '0-9.,' )
+    BYTES=$( echo "${BYTES} * ${MULT}" | bc -l )
+    SUM=$( echo "${SUM} + ${BYTES}" | bc -l )
+    __list_disks_max_div ${ORDER}
+
+    # BACK PER DEVICE LISTING
+    [ "${SIZE}"   = "" ] && local SIZE="-"
+    [ "${MODEL}"  = "" ] && local MODEL="-"
+    printf "${FORMAT}" ${DEVICE} ${SIZE} "${MODEL}"
+    unset SIZE MODEL
+  done << EOF
+  $( echo "${DISKS}" )
+EOF
+
+  # PRINT TOTAL STORAGE INFO
+  __list_disks_unit_set ${MAXUNIT}
+  SUM=$( echo "${SUM} / ${MAXDIV}" | bc -l )
+  SUM=$( printf "%3.1f" "${SUM}" )
+  printf "${FORMAT}" - "${SUM}${ENDUNIT}" "TOTAL SYSTEM STORAGE"
+  unset MAXUNIT MAXDIV ENDUNIT SUM
 }
 # __list_disks() ENDED
 
