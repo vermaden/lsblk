@@ -682,7 +682,7 @@ case ${#} in
       if [ /dev/${DISKCHECK} ]
       then
         PARTCHECK=$( echo "${DISKCHECK}" | grep -o -E '[a-zA-Z]+[0-9]+' | head -1 )
-        lsblk ${PARTCHECK} | grep --color=none -e '^DEVICE' -e "${DISKCHECK}"
+        ${0} ${PARTCHECK} | grep --color=none -e '^DEVICE' -e "${DISKCHECK}"
         exit 0
       fi
       # DISK AND/OR PARTITION DOES NOT EXIST - DISPLAY ERROR AND EXIT
