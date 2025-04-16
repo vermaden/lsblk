@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Copyright (c) 2016-2024 Slawomir Wojciech Wojtczak (vermaden)
+# Copyright (c) 2016-2025 Slawomir Wojciech Wojtczak (vermaden)
 # All rights reserved.
 #
 # THIS SOFTWARE USES FREEBSD LICENSE (ALSO KNOWN AS 2-CLAUSE BSD LICENSE)
@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 3.9 2024/12/12"
+  echo "lsblk 4.0 2025/04/16"
   echo
   exit 0
 fi
@@ -89,6 +89,7 @@ example(s):
   DEVICE SIZE MODEL
   ada0   1.8T Samsung SSD 860 QVO 2TB
   ada1   119G SAMSUNG SSD PM830 mSATA 128GB
+  -        2T TOTAL SYSTEM STORAGE
 
 hint(s):
 
@@ -677,6 +678,14 @@ case ${#} in
       DISKS="${DISKCHECK}"
       unset DISKCHECK
     else
+      # SUPPORT DISPLAYING SINGLE PARTITIONS
+      if [ /dev/${DISKCHECK} ]
+      then
+        PARTCHECK=$( echo "${DISKCHECK}" | grep -o -E '[a-zA-Z]+[0-9]+' | head -1 )
+        lsblk ${PARTCHECK} | grep --color=none -e '^DEVICE' -e "${DISKCHECK}"
+        exit 0
+      fi
+      # DISK AND/OR PARTITION DOES NOT EXIST - DISPLAY ERROR AND EXIT
       echo "NOPE: disk '${DISKCHECK}' does not exist in the system"
       echo
       __usage
