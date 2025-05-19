@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 4.0 2025/04/16"
+  echo "lsblk 4.1 2025/05/19"
   echo
   exit 0
 fi
@@ -59,7 +59,8 @@ usage:
   BASIC USAGE INFORMATION
   =======================
   # ${NAME} [DISK]
-  # ${NAME} -d | --disks
+  # ${NAME} --disks | -d
+  # ${NAME} --version
 
 example(s):
 
@@ -547,11 +548,13 @@ __list_disks_max_unit() { # 1=UNIT_TO_CHECK_IN_NUMBER
 # SET DIV/UNIT/MAXDIV VALUE
 __list_disks_max_div() { # 1=ORDER TO SET
   case ${1} in
+    (0) DIV=1                                       ; UNIT=B ;;
     (1) DIV=$(( 1024 ))                             ; UNIT=K ;;
     (2) DIV=$(( 1024 * 1024 ))                      ; UNIT=M ;;
     (3) DIV=$(( 1024 * 1024 * 1024 ))               ; UNIT=G ;;
     (4) DIV=$(( 1024 * 1024 * 1024 * 1024 ))        ; UNIT=T ;;
     (5) DIV=$(( 1024 * 1024 * 1024 * 1024 * 1024 )) ; UNIT=E ;;
+    (*) DIV=1                                       ; UNIT=B ;;
   esac
   if [ ${DIV} -gt ${MAXDIV} ]
   then
@@ -563,6 +566,7 @@ __list_disks_max_div() { # 1=ORDER TO SET
 # SET ENDUNIT FOR TOTALE STORAGE SUM PRINTING
 __list_disks_unit_set() { # 1=ORDER TO SET
   case ${1} in
+    (0) ENDUNIT=B ;;
     (1) ENDUNIT=K ;;
     (2) ENDUNIT=M ;;
     (3) ENDUNIT=G ;;
@@ -595,7 +599,7 @@ __list_disks() {
   SUM=0
 
   # SET FORMAT
-  local FORMAT="%-${DEVICE_WIDTH}s %4s %s\n"
+  local FORMAT="%-${DEVICE_WIDTH}s %5s %s\n"
 
   # PRINT HEADER
   printf "${FORMAT}" DEVICE SIZE MODEL
@@ -619,11 +623,13 @@ __list_disks() {
 
     # CALCULATE TOTAL STORAGE SUM
     case ${SIZE} in
+      (*B|*b) MULT=1                                                                                  ;;
       (*K|*k) MULT=$(( 1024                             )) ; ORDER=1 ; __list_disks_max_unit ${ORDER} ;;
       (*M|*m) MULT=$(( 1024 * 1024                      )) ; ORDER=2 ; __list_disks_max_unit ${ORDER} ;;
       (*G|*g) MULT=$(( 1024 * 1024 * 1024               )) ; ORDER=3 ; __list_disks_max_unit ${ORDER} ;;
       (*T|*t) MULT=$(( 1024 * 1024 * 1024 * 1024        )) ; ORDER=4 ; __list_disks_max_unit ${ORDER} ;;
       (*E|*e) MULT=$(( 1024 * 1024 * 1024 * 1024 * 1024 )) ; ORDER=5 ; __list_disks_max_unit ${ORDER} ;;
+      (*)     MULT=1                                       ;                                          ;;
     esac
     BYTES=$( echo ${SIZE} | tr -c -d '0-9.,' )
     BYTES=$( echo "${BYTES} * ${MULT}" | bc -l )
@@ -662,12 +668,12 @@ case ${#} in
   (1)
     # SINGLE ARGUMENT MEANS 'SINGLE DISK' OR 'ENTIRE DISKS ONLY' OR 'HELP'
     case ${1} in
-      (h|-h|--h|help|-help|--help)
-        __usage
-        ;;
       (-d|--disks)
         __list_disks
         exit 0
+        ;;
+      (h|-h|--h|help|-help|--help|*)
+        __usage
         ;;
     esac
     # SINGLE DISK CHECK
