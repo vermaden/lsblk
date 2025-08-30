@@ -339,7 +339,7 @@ __list_block_devices() {
   ) \
       | sed 's|/dev/||g' \
       | sed -r "s/[[:cntrl:]]\[[0-9]{1,3}m//g" \
-      | sort -u \
+      | sort -uV \
       | sed '/^s*$/d'
 }
 # __list_block_devices() ENDED
