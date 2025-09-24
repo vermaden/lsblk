@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 4.1 2025/05/19"
+  echo "lsblk 4.2 2025/09/24"
   echo
   exit 0
 fi
@@ -620,6 +620,9 @@ __list_disks() {
         unset GEOM_DISK_LIST
         ;;
     esac
+
+    # OMIT CARD READERS THAT HAVE '0B' SIZE
+    [ "${SIZE}" = "0B" ] && continue
 
     # CALCULATE TOTAL STORAGE SUM
     case ${SIZE} in
