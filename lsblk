@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 4.2 2025/09/24"
+  echo "lsblk 4.3 2025/12/14"
   echo
   exit 0
 fi
@@ -616,13 +616,11 @@ __list_disks() {
       (*)
         local GEOM_DISK_LIST=$( geom disk list ${DEVICE} 2> /dev/null )
         local SIZE=$(  echo "${GEOM_DISK_LIST}" | awk '/Mediasize:/ {print $NF}' | tr -d '()' )
-        local MODEL=$( echo "${GEOM_DISK_LIST}" | awk -F ':' '/descr:/ {print $2}' | sed '$s/^.//' | tr -cd '0-9a-zA-Z -./\n' | tr -d '?' )
+        local MODEL=$( echo "${GEOM_DISK_LIST}" | awk -F ':' '/descr:/ {print $2}' | sed -e '$s/^.//' -e 's.- .-.g' -e 's. -.-.g' | tr -cd '0-9a-zA-Z -./\n' | tr -d '?' )
         unset GEOM_DISK_LIST
+
         ;;
     esac
-
-    # OMIT CARD READERS THAT HAVE '0B' SIZE
-    [ "${SIZE}" = "0B" ] && continue
 
     # CALCULATE TOTAL STORAGE SUM
     case ${SIZE} in
