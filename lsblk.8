@@ -1,0 +1,122 @@
+.\" SPDX-License-Identifier: BSD-2-Clause
+.Dd March 11, 2026
+.Dt LSBLK 8
+.Os
+.Sh NAME
+.Nm lsblk
+.Nd list block devices and their device trees
+.Sh SYNOPSIS
+.Nm
+.Op Ar disk
+.Nm
+.Fl d
+.Nm
+.Fl -disks
+.Nm
+.Fl -version
+.Nm
+.Fl -help
+.Sh DESCRIPTION
+The lsblk(8) tool prints tree oriented view of block/character devices.
+Output is intended to provide compact summary of whole disks, partition
+schemes, partitions with related information about them like encryption
+layers or size and basic identification.
+.Pp
+If the optional
+.Ar disk
+option is specified - only device tree rooted at that device is displayed.
+.Pp
+The default output format is columnar - the columns include:
+.Bl -tag -width "MAJ:MIN" -compact
+.It Cm DEVICE
+Device or provider name.
+.It Cm MAJ:MIN
+Major/minor numbers formatted as major:minor when available.
+.It Cm SIZE
+Size of the device/provider.
+.It Cm TYPE
+Provider/partition type (for example,
+.Cm GPT ,
+.Cm MBR ,
+.Cm freebsd-ufs ,
+.Cm freebsd-zfs ) .
+.It Cm LABEL
+Label associated with provider when available.
+.It Cm MOUNT
+Mount point when available.
+Certain filesystem types may display sentinel such as
+.Ql <ZFS>
+to indicate managed mounts.
+.El
+.Sh OPTIONS
+.Bl -tag -width "--version" -offset indent
+.It Fl d | Fl -disks
+Display only whole disks (no partition/provider tree expansion).
+This mode is commonly used to summarize inventory and model information.
+.It Fl -help
+Display brief usage message and exit.
+.It Fl -version
+Display version information and exit.
+.El
+.Sh EXAMPLES
+List all block devices in the system:
+.Bd -literal -offset indent
+# lsblk
+DEVICE         MAJ:MIN SIZE TYPE                      LABEL MOUNT
+ada0             0:92  932G GPT                           - -
+  ada0p1         0:100 200M efi                    efiboot0 -
+  ada0p2         0:101 512K freebsd-boot           gptboot0 -
+  <FREE>         -:-   492K -                             - -
+  ada0p3         0:102 931G freebsd-zfs                zfs0 <ZFS>
+  ada0p3.eli     0:106 931G freebsd-zfs                   - <ZFS>
+.Ed
+.Pp
+List only the
+.Cm da1
+device tree:
+.Bd -literal -offset indent
+# lsblk da1
+DEVICE         MAJ:MIN SIZE TYPE                      LABEL MOUNT
+da1              0:80  2.0G MBR                           - -
+  da1s1          0:80  2.0G freebsd                       - -
+    da1s1a       0:81  1.0G freebsd-ufs                root /
+    da1s1b       0:82  1.0G freebsd-swap               swap SWAP
+.Ed
+.Pp
+List whole disks only:
+.Bd -literal -offset indent
+# lsblk -d
+DEVICE SIZE MODEL
+ada0   1.8T Samsung SSD 860 QVO 2TB
+ada1   119G SAMSUNG SSD PM830 mSATA 128GB
+-        2T TOTAL SYSTEM STORAGE
+.Ed
+.Pp
+Display version information:
+.Bd -literal -offset indent
+# lsblk --version
+.Ed
+.Pp
+Enumerate physical disks as seen by the kernel (useful for establishing the set
+of disk roots prior to invoking lsblk(8) tool:
+.Bd -literal -offset indent
+# sysctl kern.disks
+kern.disks: ada0 da0 da1
+.Ed
+.Pp
+.Sh SEE ALSO
+.Xr sysctl 8 ,
+.Xr mdconfig 8 ,
+.Xr gpart 8 ,
+.Xr diskinfo 8 ,
+.Xr geom 8 ,
+.Xr geli 8 ,
+.Xr zfs 8 ,
+.Xr zpool 8
+.Sh HISTORY
+The FreeBSD implementation of lsblk(8) tool first appeared in 2020.
+.Sh AUTHORS
+.Bl -tag
+Author and maintainer of FreeBSD version of lsblk(8) is:
+.It An Slawomir Wojciech Wojtczak (vermaden) Aq Mt vermaden@interia.pl
+.Bl

@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Copyright (c) 2016-2025 Slawomir Wojciech Wojtczak (vermaden)
+# Copyright (c) 2016-2026 Slawomir Wojciech Wojtczak (vermaden)
 # All rights reserved.
 #
 # THIS SOFTWARE USES FREEBSD LICENSE (ALSO KNOWN AS 2-CLAUSE BSD LICENSE)
@@ -45,7 +45,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 4.3 2025/12/14"
+  echo "lsblk 4.1 2026/03/11"
   echo
   exit 0
 fi
@@ -461,6 +461,7 @@ __gpart_present() { # 1=DEV
           # WHOLE DEVICE
           LEVEL_DEV=1
           FORMAT="${FORMAT_L0}"
+          SIZE=$( diskinfo -v ${DEV} | awk '/# mediasize in bytes / {print $NF}' | tr -d '()' )
           __print_parts ${NAME} ${TYPE} ${SIZE} ${SIZE_FREE}
         else
           # PARTITION
@@ -494,6 +495,7 @@ __gpart_present() { # 1=DEV
           else
             # FILESYSTEM
             [ "${TYPE}" = "freebsd-swap" ] && __swap_mount ${DEV}
+            SIZE=$( diskinfo -v ${DEV} | awk '/# mediasize in bytes / {print $NF}' | tr -d '()' )
             __mount_label ${NAME}
             __print_parts ${NAME} ${TYPE} ${SIZE} ${SIZE_FREE}
           fi
@@ -673,8 +675,9 @@ case ${#} in
         __list_disks
         exit 0
         ;;
-      (h|-h|--h|help|-help|--help|*)
+      (-h|--h|help|-help|--help)
         __usage
+        exit 0
         ;;
     esac
     # SINGLE DISK CHECK
@@ -705,9 +708,9 @@ case ${#} in
 esac
 
 # SET OUTPUT FORMAT AND PRINT HEADER
-    FORMAT_L0="%-14s %3s:%-3s %4s %-18s %26s %s\n"
-  FORMAT_L1="  %-12s %3s:%-3s %4s %-18s %26s %s\n"
-FORMAT_L2="    %-10s %3s:%-3s %4s %-18s %26s %s\n"
+    FORMAT_L0="%-14s %3s:%-3s %5s %-18s %26s %s\n"
+  FORMAT_L1="  %-12s %3s:%-3s %5s %-18s %26s %s\n"
+FORMAT_L2="    %-10s %3s:%-3s %5s %-18s %26s %s\n"
 FORMAT="${FORMAT_L0}"
 printf "${FORMAT}" DEVICE MAJ MIN SIZE TYPE LABEL MOUNT
 
