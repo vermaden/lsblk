@@ -31,6 +31,7 @@
 # vermaden [AT] interia [DOT] pl
 # https://vermaden.wordpress.com
 
+# PATH
 PATH=${PATH}:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
 
 # DISPLAY VERSION
@@ -45,7 +46,7 @@ then
   echo "    \  \___ \  \  \  \_   \\\ \ \    \  / "
   echo "     \___\__/\____/\___\/\_\\\_\_\____\/  "
   echo
-  echo "lsblk 4.1 2026/03/11"
+  echo "lsblk 4.2 2026/07/28"
   echo
   exit 0
 fi
@@ -112,8 +113,8 @@ __EOF
 # GET MAJOR/MINOR NUMBERS
 __major_minor() { # 1=DEV
   local DEV=$( echo "${1}" | sed s./dev/..g )
-  MAJ=$( stat -f "%Hr" /dev/${DEV} )
-  MIN=$( stat -f "%Lr" /dev/${DEV} )
+  MAJ=$( stat -f "%Hr" /dev/${DEV} 2> /dev/null )
+  MIN=$( stat -f "%Lr" /dev/${DEV} 2> /dev/null )
 }
 # __major_minor() ENDED
 
@@ -461,8 +462,8 @@ __gpart_present() { # 1=DEV
           # WHOLE DEVICE
           LEVEL_DEV=1
           FORMAT="${FORMAT_L0}"
-          SIZE=$( diskinfo -v ${DEV} | awk '/# mediasize in bytes / {print $NF}' | tr -d '()' )
-          __print_parts ${NAME} ${TYPE} ${SIZE} ${SIZE_FREE}
+          [ "${NAME}" != "" ] && \
+            __print_parts ${NAME} ${TYPE} ${SIZE} ${SIZE_FREE}
         else
           # PARTITION
           FORMAT="${FORMAT_L1}"
@@ -495,7 +496,6 @@ __gpart_present() { # 1=DEV
           else
             # FILESYSTEM
             [ "${TYPE}" = "freebsd-swap" ] && __swap_mount ${DEV}
-            SIZE=$( diskinfo -v ${DEV} | awk '/# mediasize in bytes / {print $NF}' | tr -d '()' )
             __mount_label ${NAME}
             __print_parts ${NAME} ${TYPE} ${SIZE} ${SIZE_FREE}
           fi
@@ -520,10 +520,7 @@ __gpart_absent() { # 1=DEV
     (*)   local SIZE=$( geom disk list ${DEV} 2> /dev/null | awk '/Mediasize:/         {print $NF}' | tr -d '()' ) ;;
   esac
   # WHEN SIZE IS NOT AVAILABLE ITS PROBABLY EMPTY CARD READER
-  if [ "${SIZE}"  = "0B" ]
-  then
-    return
-  fi
+  [ "${SIZE}"  = "0B" ] && return
   local SIZE_FREE="-"
   __type ${DEV}
   __mount_label ${DEV}
@@ -609,6 +606,12 @@ __list_disks() {
   # DO THE JOB
   while read DEVICE
   do
+
+    if ! diskinfo ${DEVICE} 1> /dev/null 2> /dev/null
+    then
+      continue
+    fi
+
     # GET PER DEVICE INFO
     case ${DEVICE} in
       (md*)
@@ -620,7 +623,6 @@ __list_disks() {
         local SIZE=$(  echo "${GEOM_DISK_LIST}" | awk '/Mediasize:/ {print $NF}' | tr -d '()' )
         local MODEL=$( echo "${GEOM_DISK_LIST}" | awk -F ':' '/descr:/ {print $2}' | sed -e '$s/^.//' -e 's.- .-.g' -e 's. -.-.g' | tr -cd '0-9a-zA-Z -./\n' | tr -d '?' )
         unset GEOM_DISK_LIST
-
         ;;
     esac
 
